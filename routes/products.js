@@ -2,26 +2,18 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db/pool');
 
-const PRODUCT_QUERY = `
-  SELECT
-    p.*,
-    COALESCE(
-      JSON_AGG(
-        JSON_BUILD_OBJECT('id', pi.id, 'filename', pi.filename, 'sort_order', pi.sort_order)
-        ORDER BY pi.sort_order
-      ) FILTER (WHERE pi.id IS NOT NULL),
-      '[]'
-    ) AS images,
-    COALESCE(
-      JSON_AGG(
-        JSON_BUILD_OBJECT('id', pc.id, 'name', pc.name, 'value', pc.value, 'sort_order', pc.sort_order)
-        ORDER BY pc.sort_order
-      ) FILTER (WHERE pc.id IS NOT NULL),
-      '[]'
-    ) AS characteristics
-  FROM products p
-  LEFT JOIN product_images pi ON pi.product_id = p.id
-  LEFT JOIN product_characteristics pc ON pc.product_id = p.id
+// Subqueries instead of double JOIN — avoids cartesian product (images × characteristics duplicates)
+const IMAGES_SUB = `
+  (SELECT COALESCE(JSON_AGG(
+    JSON_BUILD_OBJECT('id', pi.id, 'filename', pi.filename, 'sort_order', pi.sort_order)
+    ORDER BY pi.sort_order
+  ), '[]') FROM product_images pi WHERE pi.product_id = p.id)
+`;
+const CHARS_SUB = `
+  (SELECT COALESCE(JSON_AGG(
+    JSON_BUILD_OBJECT('id', pc.id, 'name', pc.name, 'value', pc.value, 'sort_order', pc.sort_order)
+    ORDER BY pc.sort_order
+  ), '[]') FROM product_characteristics pc WHERE pc.product_id = p.id)
 `;
 
 // GET /api/products?page=1&limit=12&search=
@@ -33,24 +25,30 @@ router.get('/', async (req, res) => {
     const search = (req.query.search || '').trim();
 
     const countParams = search ? [`%${search}%`] : [];
-    const countWhere = search ? 'WHERE p.name ILIKE $1' : '';
+    const countWhere = search ? 'WHERE name ILIKE $1' : '';
     const { rows: countRows } = await pool.query(
-      `SELECT COUNT(*) FROM products p ${countWhere}`,
+      `SELECT COUNT(*) FROM products ${countWhere}`,
       countParams
     );
     const total = parseInt(countRows[0].count);
 
     let queryParams, whereClause;
     if (search) {
-      queryParams = [limit, offset, `%${search}%`];
-      whereClause = 'WHERE p.name ILIKE $3';
+      queryParams = [`%${search}%`, limit, offset];
+      whereClause = 'WHERE p.name ILIKE $1';
     } else {
       queryParams = [limit, offset];
       whereClause = '';
     }
+    const limitParam = search ? '$2' : '$1';
+    const offsetParam = search ? '$3' : '$2';
 
     const { rows: products } = await pool.query(
-      `${PRODUCT_QUERY} ${whereClause} GROUP BY p.id ORDER BY p.created_at DESC LIMIT $1 OFFSET $2`,
+      `SELECT p.*, ${IMAGES_SUB} AS images, ${CHARS_SUB} AS characteristics
+       FROM products p
+       ${whereClause}
+       ORDER BY p.created_at DESC
+       LIMIT ${limitParam} OFFSET ${offsetParam}`,
       queryParams
     );
 
@@ -74,7 +72,8 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `${PRODUCT_QUERY} WHERE p.id = $1 GROUP BY p.id`,
+      `SELECT p.*, ${IMAGES_SUB} AS images, ${CHARS_SUB} AS characteristics
+       FROM products p WHERE p.id = $1`,
       [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Not found' });
