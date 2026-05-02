@@ -15,7 +15,9 @@ export default function ProductCard({ product, onEdit, onDelete }) {
             {imgCount > 1 && <span className="card-img-count">+{imgCount - 1}</span>}
           </>
         ) : (
-          <div className="card-placeholder">🪞</div>
+          <div className="card-placeholder">
+            <div className="card-placeholder-box" />
+          </div>
         )}
       </div>
 
@@ -27,7 +29,7 @@ export default function ProductCard({ product, onEdit, onDelete }) {
           <div className="card-price-empty">Цена не указана</div>
         )}
         {charCount > 0 && (
-          <div className="card-meta">{charCount} характеристик{charCount === 1 ? 'а' : charCount < 5 ? 'и' : ''}</div>
+          <div className="card-meta">{charCount} характеристик</div>
         )}
       </div>
 
@@ -36,13 +38,13 @@ export default function ProductCard({ product, onEdit, onDelete }) {
           className="btn btn-secondary btn-sm"
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
         >
-          ✏️ Изменить
+          Изменить
         </button>
         <button
           className="btn btn-danger btn-sm"
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
         >
-          🗑 Удалить
+          Удалить
         </button>
       </div>
     </div>

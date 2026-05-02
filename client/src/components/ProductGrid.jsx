@@ -17,6 +17,12 @@ function Skeleton() {
   );
 }
 
+const SearchIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 6.5C10 8.433 8.433 10 6.5 10C4.567 10 3 8.433 3 6.5C3 4.567 4.567 3 6.5 3C8.433 3 10 4.567 10 6.5ZM9.30377 10.0118C8.53487 10.6245 7.55917 11 6.5 11C4.01472 11 2 8.98528 2 6.5C2 4.01472 4.01472 2 6.5 2C8.98528 2 11 4.01472 11 6.5C11 7.55917 10.6245 8.53487 10.0118 9.30377L12.8536 12.1464C13.0488 12.3417 13.0488 12.6583 12.8536 12.8536C12.6583 13.0488 12.3417 13.0488 12.1464 12.8536L9.30377 10.0118Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"/>
+  </svg>
+);
+
 export default function ProductGrid({ onEdit }) {
   const [search, setSearch] = useState('');
   const [debSearch, setDebSearch] = useState('');
@@ -69,7 +75,7 @@ export default function ProductGrid({ onEdit }) {
     <div>
       <div className="controls">
         <div className="search-wrap">
-          <span className="search-icon">🔍</span>
+          <span className="search-icon"><SearchIcon /></span>
           <input
             className="search-input"
             placeholder="Поиск по названию..."
@@ -90,11 +96,10 @@ export default function ProductGrid({ onEdit }) {
         </div>
       ) : error ? (
         <div className="error-state">
-          <p>Ошибка загрузки. Проверьте подключение к серверу.</p>
+          Ошибка загрузки. Проверьте подключение к серверу.
         </div>
       ) : products.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon">🪞</div>
           <h3>{debSearch ? 'Ничего не найдено' : 'Каталог пуст'}</h3>
           <p>{debSearch ? 'Попробуйте другой запрос' : 'Добавьте первый товар через кнопку выше'}</p>
         </div>

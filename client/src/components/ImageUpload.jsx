@@ -30,7 +30,7 @@ export default function ImageUpload({ images, onChange }) {
   const onDragOver = (e) => { e.preventDefault(); setDragging(true); };
   const onDragLeave = () => setDragging(false);
 
-  const remove = (filename) => onChange(images.filter((f) => f !== filename));
+  const remove = (url) => onChange(images.filter((u) => u !== url));
 
   return (
     <div>
@@ -55,22 +55,22 @@ export default function ImageUpload({ images, onChange }) {
           </div>
         ) : (
           <>
-            <div className="drop-zone-icon">📁</div>
-            <p><strong>Нажмите или перетащите</strong> фотографии сюда</p>
-            <p>JPG, PNG, WebP · до 10 МБ каждый файл</p>
+            <div className="drop-zone-arrow">↑</div>
+            <p><strong>Нажмите или перетащите</strong> фотографии</p>
+            <p>JPG, PNG, WebP · до 10 МБ каждый</p>
           </>
         )}
       </div>
 
       {images.length > 0 && (
         <div className="thumb-grid">
-          {images.map((filename, i) => (
-            <div key={filename} className={`thumb ${i === 0 ? 'primary' : ''}`}>
-              <img src={getImageUrl(filename)} alt="" loading="lazy" />
+          {images.map((url, i) => (
+            <div key={url} className={`thumb ${i === 0 ? 'primary' : ''}`}>
+              <img src={getImageUrl(url)} alt="" loading="lazy" />
               <button
                 type="button"
                 className="thumb-del"
-                onClick={() => remove(filename)}
+                onClick={() => remove(url)}
                 title="Удалить"
               >
                 ✕

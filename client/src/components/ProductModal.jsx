@@ -5,6 +5,22 @@ import { useToast } from '../ToastContext';
 import ImageUpload from './ImageUpload';
 import CharacteristicsEditor from './CharacteristicsEditor';
 
+const DEFAULT_CHARS = [
+  { name: 'Размер', value: '' },
+  { name: 'Форма', value: '' },
+  { name: 'Тип подсветки', value: '' },
+  { name: 'Цвет подсветки', value: '' },
+  { name: 'Мощность', value: '' },
+  { name: 'IP защита', value: '' },
+  { name: 'Цвет рамки', value: '' },
+  { name: 'Материал рамки', value: '' },
+  { name: 'Управление', value: '' },
+  { name: 'Напряжение', value: '' },
+  { name: 'Гарантия', value: '' },
+  { name: 'Вес', value: '' },
+  { name: 'Крепление', value: '' },
+];
+
 export default function ProductModal({ product, onClose }) {
   const isEdit = !!product;
   const qc = useQueryClient();
@@ -17,7 +33,9 @@ export default function ProductModal({ product, onClose }) {
     product?.images?.map((i) => i.filename) ?? []
   );
   const [chars, setChars] = useState(
-    product?.characteristics?.map((c) => ({ name: c.name, value: c.value })) ?? []
+    product?.characteristics?.length > 0
+      ? product.characteristics.map((c) => ({ name: c.name, value: c.value }))
+      : DEFAULT_CHARS
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -51,23 +69,14 @@ export default function ProductModal({ product, onClose }) {
     }
   };
 
-  const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) onClose();
-  };
-
   return (
-    <div className="modal-overlay" onClick={handleOverlayClick}>
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header">
           <h2 className="modal-title">
-            {isEdit ? `Редактировать товар` : 'Добавить товар'}
+            {isEdit ? 'Редактировать товар' : 'Добавить товар'}
           </h2>
-          <button
-            type="button"
-            className="btn btn-ghost btn-icon"
-            onClick={onClose}
-            aria-label="Закрыть"
-          >
+          <button type="button" className="btn btn-ghost btn-icon" onClick={onClose}>
             ✕
           </button>
         </div>
@@ -115,12 +124,12 @@ export default function ProductModal({ product, onClose }) {
             </div>
 
             <div>
-              <div className="section-title">📷 Фотографии</div>
+              <div className="section-title">Фотографии</div>
               <ImageUpload images={images} onChange={setImages} />
             </div>
 
             <div>
-              <div className="section-title">📋 Характеристики</div>
+              <div className="section-title">Характеристики</div>
               <CharacteristicsEditor value={chars} onChange={setChars} />
             </div>
           </div>
@@ -130,7 +139,7 @@ export default function ProductModal({ product, onClose }) {
               Отмена
             </button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Сохранение...' : isEdit ? 'Сохранить изменения' : 'Добавить товар'}
+              {saving ? 'Сохранение...' : isEdit ? 'Сохранить' : 'Добавить товар'}
             </button>
           </div>
         </form>
