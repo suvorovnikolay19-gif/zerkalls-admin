@@ -19,4 +19,5 @@ export const uploadApi = {
   delete: (filename) => api.delete(`/upload/${filename}`),
 };
 
-export const getImageUrl = (filename) => `/uploads/${filename}`;
+// Cloudinary returns full https:// URLs stored directly in DB
+export const getImageUrl = (url) => url;

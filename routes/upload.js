@@ -1,21 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const { Readable } = require('stream');
+const cloudinary = require('cloudinary').v2;
 
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-  },
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
@@ -23,21 +19,42 @@ const upload = multer({
   },
 });
 
-// POST /api/upload  (multipart: field "images", up to 20 files)
-router.post('/', upload.array('images', 20), (req, res) => {
-  const filenames = req.files.map((f) => f.filename);
-  res.json({ filenames });
+function uploadBuffer(buffer) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'zerkalls', resource_type: 'image' },
+      (err, result) => (err ? reject(err) : resolve(result))
+    );
+    Readable.from(buffer).pipe(stream);
+  });
+}
+
+// POST /api/upload
+router.post('/', upload.array('images', 20), async (req, res) => {
+  try {
+    const results = await Promise.all(req.files.map((f) => uploadBuffer(f.buffer)));
+    res.json({ filenames: results.map((r) => r.secure_url) });
+  } catch (err) {
+    console.error('Cloudinary upload error:', err);
+    res.status(500).json({ error: 'Upload failed' });
+  }
 });
 
-// DELETE /api/upload/:filename
-router.delete('/:filename', (req, res) => {
-  const filepath = path.join(UPLOAD_DIR, path.basename(req.params.filename));
-  fs.unlink(filepath, (err) => {
-    if (err && err.code !== 'ENOENT') {
-      return res.status(500).json({ error: 'Failed to delete file' });
+// DELETE /api/upload  (body: { url })
+router.delete('/', async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.json({ ok: true });
+    // Extract public_id from Cloudinary URL
+    const match = url.match(/\/zerkalls\/([^.]+)/);
+    if (match) {
+      await cloudinary.uploader.destroy(`zerkalls/${match[1]}`);
     }
     res.json({ ok: true });
-  });
+  } catch (err) {
+    console.error('Cloudinary delete error:', err);
+    res.status(500).json({ error: 'Delete failed' });
+  }
 });
 
 module.exports = router;
