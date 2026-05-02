@@ -42,7 +42,6 @@ export default function ProductModal({ product, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) { setError('Введите название товара'); return; }
     setSaving(true);
     setError('');
     try {
@@ -87,9 +86,7 @@ export default function ProductModal({ product, onClose }) {
 
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">
-                  Название <span className="form-required">*</span>
-                </label>
+                <label className="form-label">Название</label>
                 <input
                   className="form-input"
                   value={name}
