@@ -5,6 +5,18 @@ import { useToast } from '../ToastContext';
 import ImageUpload from './ImageUpload';
 import CharacteristicsEditor from './CharacteristicsEditor';
 
+const DEFAULT_CHARS = [
+  { name: 'Форма', value: '' },
+  { name: 'Тип подсветки', value: '' },
+  { name: 'Ширина подсвеченной области', value: '' },
+  { name: 'Зеркальный отступ', value: '' },
+  { name: 'Толщина зеркального полотна', value: '' },
+  { name: 'Общая толщина изделия', value: '' },
+  { name: 'Тип рамы', value: '' },
+  { name: 'Толщина рамы', value: '' },
+  { name: 'Тип крепления', value: '' },
+];
+
 export default function ProductModal({ product, onClose }) {
   const isEdit = !!product;
   const qc = useQueryClient();
@@ -17,7 +29,9 @@ export default function ProductModal({ product, onClose }) {
     product?.images?.map((i) => i.filename) ?? []
   );
   const [chars, setChars] = useState(
-    product?.characteristics?.map((c) => ({ name: c.name, value: c.value })) ?? []
+    product?.characteristics?.length
+      ? product.characteristics.map((c) => ({ name: c.name, value: c.value }))
+      : DEFAULT_CHARS.map((c) => ({ ...c }))
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -32,7 +46,7 @@ export default function ProductModal({ product, onClose }) {
         description,
         price: parseFloat(price) || 0,
         images,
-        characteristics: chars.filter((c) => c.name.trim()),
+        characteristics: chars.filter((c) => c.name.trim() && c.value.trim()),
       };
       if (isEdit) {
         await productsApi.update(product.id, payload);
