@@ -5,22 +5,6 @@ import { useToast } from '../ToastContext';
 import ImageUpload from './ImageUpload';
 import CharacteristicsEditor from './CharacteristicsEditor';
 
-const DEFAULT_CHARS = [
-  { name: 'Размер', value: '' },
-  { name: 'Форма', value: '' },
-  { name: 'Тип подсветки', value: '' },
-  { name: 'Цвет подсветки', value: '' },
-  { name: 'Мощность', value: '' },
-  { name: 'IP защита', value: '' },
-  { name: 'Цвет рамки', value: '' },
-  { name: 'Материал рамки', value: '' },
-  { name: 'Управление', value: '' },
-  { name: 'Напряжение', value: '' },
-  { name: 'Гарантия', value: '' },
-  { name: 'Вес', value: '' },
-  { name: 'Крепление', value: '' },
-];
-
 export default function ProductModal({ product, onClose }) {
   const isEdit = !!product;
   const qc = useQueryClient();
@@ -33,9 +17,7 @@ export default function ProductModal({ product, onClose }) {
     product?.images?.map((i) => i.filename) ?? []
   );
   const [chars, setChars] = useState(
-    product?.characteristics?.length > 0
-      ? product.characteristics.map((c) => ({ name: c.name, value: c.value }))
-      : DEFAULT_CHARS
+    product?.characteristics?.map((c) => ({ name: c.name, value: c.value })) ?? []
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
