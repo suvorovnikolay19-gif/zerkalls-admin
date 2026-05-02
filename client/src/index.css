@@ -69,7 +69,7 @@ input[type="number"] { -moz-appearance: textfield; }
   letter-spacing: -0.04em;
   color: var(--fg);
 }
-.header-logo span { color: var(--accent); }
+.header-logo span { color: var(--fg); }
 
 /* ===== BUTTONS ===== */
 .btn {
