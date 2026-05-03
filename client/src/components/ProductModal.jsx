@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { productsApi, attributesApi, mirrorClassesApi } from '../api';
 import { useToast } from '../ToastContext';
@@ -9,6 +9,8 @@ export default function ProductModal({ product, onClose }) {
   const isEdit = !!product;
   const qc = useQueryClient();
   const toast = useToast();
+  const dirty = useRef(false);
+  const [confirmClose, setConfirmClose] = useState(false);
 
   const { data: attributes = [] } = useQuery({
     queryKey: ['attributes'],
@@ -36,7 +38,18 @@ export default function ProductModal({ product, onClose }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const touch = () => { dirty.current = true; };
+
+  const tryClose = () => {
+    if (dirty.current && !saving) {
+      setConfirmClose(true);
+    } else {
+      onClose();
+    }
+  };
+
   const handleClassChange = (newClassId) => {
+    touch();
     setClassId(newClassId);
     if (newClassId) {
       const cls = mirrorClasses.find((c) => c.id === parseInt(newClassId));
@@ -76,6 +89,7 @@ export default function ProductModal({ product, onClose }) {
         toast('Товар добавлен');
       }
       qc.invalidateQueries({ queryKey: ['products'] });
+      dirty.current = false;
       onClose();
     } catch {
       setError('Ошибка при сохранении. Попробуйте ещё раз.');
@@ -85,13 +99,13 @@ export default function ProductModal({ product, onClose }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && tryClose()}>
       <div className="modal">
         <div className="modal-header">
           <h2 className="modal-title">
             {isEdit ? 'Редактировать товар' : 'Добавить товар'}
           </h2>
-          <button type="button" className="btn btn-ghost btn-icon" onClick={onClose}>
+          <button type="button" className="btn btn-ghost btn-icon" onClick={tryClose}>
             ✕
           </button>
         </div>
@@ -106,7 +120,7 @@ export default function ProductModal({ product, onClose }) {
                 <input
                   className="form-input"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => { setName(e.target.value); touch(); }}
                   placeholder="Зеркало с подсветкой..."
                   autoFocus
                 />
@@ -119,7 +133,7 @@ export default function ProductModal({ product, onClose }) {
                   min="0"
                   step="1"
                   value={price}
-                  onChange={(e) => setPrice(e.target.value)}
+                  onChange={(e) => { setPrice(e.target.value); touch(); }}
                   placeholder="0"
                 />
               </div>
@@ -144,7 +158,7 @@ export default function ProductModal({ product, onClose }) {
               <textarea
                 className="form-textarea"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => { setDescription(e.target.value); touch(); }}
                 placeholder="Опишите товар: особенности, материалы, способы использования..."
                 rows={4}
               />
@@ -152,23 +166,39 @@ export default function ProductModal({ product, onClose }) {
 
             <div>
               <div className="section-title">Фотографии</div>
-              <ImageUpload images={images} onChange={setImages} />
+              <ImageUpload images={images} onChange={(v) => { setImages(v); touch(); }} />
             </div>
 
             <div>
               <div className="section-title">Характеристики</div>
-              <CharacteristicsEditor value={chars} onChange={setChars} attributes={attributes} />
+              <CharacteristicsEditor
+                value={chars}
+                onChange={(v) => { setChars(v); touch(); }}
+                attributes={attributes}
+              />
             </div>
           </div>
 
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
-              Отмена
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Сохранение...' : isEdit ? 'Сохранить' : 'Добавить товар'}
-            </button>
-          </div>
+          {confirmClose ? (
+            <div className="confirm-bar">
+              <span>Изменения не сохранятся. Закрыть?</span>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfirmClose(false)}>
+                Продолжить редактирование
+              </button>
+              <button type="button" className="btn btn-danger btn-sm" onClick={onClose}>
+                Да, закрыть
+              </button>
+            </div>
+          ) : (
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={tryClose}>
+                Отмена
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>
+                {saving ? 'Сохранение...' : isEdit ? 'Сохранить' : 'Добавить товар'}
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>

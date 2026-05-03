@@ -2,12 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db/pool');
 
-// GET /api/mirror-classes — list all with their attributes
+// GET /api/mirror-classes
 router.get('/', async (req, res) => {
   try {
-    const { rows: classes } = await pool.query(
-      'SELECT * FROM mirror_classes ORDER BY name'
-    );
+    const { rows: classes } = await pool.query('SELECT * FROM mirror_classes ORDER BY name');
     const { rows: classAttrs } = await pool.query(
       `SELECT mca.class_id, mca.attribute_id, mca.sort_order, a.name AS attr_name
        FROM mirror_class_attributes mca
@@ -35,9 +33,12 @@ router.post('/', async (req, res) => {
     await client.query('BEGIN');
     const { name, attribute_ids = [] } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Name required' });
+    const { rows: dup } = await client.query(
+      'SELECT id FROM mirror_classes WHERE LOWER(name) = LOWER($1)', [name.trim()]
+    );
+    if (dup.length) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Duplicate' }); }
     const { rows } = await client.query(
-      'INSERT INTO mirror_classes (name) VALUES ($1) RETURNING *',
-      [name.trim()]
+      'INSERT INTO mirror_classes (name) VALUES ($1) RETURNING *', [name.trim()]
     );
     const cls = rows[0];
     for (let i = 0; i < attribute_ids.length; i++) {
@@ -64,9 +65,13 @@ router.put('/:id', async (req, res) => {
     await client.query('BEGIN');
     const { name, attribute_ids = [] } = req.body;
     const { id } = req.params;
-    const { rows } = await client.query(
-      'UPDATE mirror_classes SET name=$1 WHERE id=$2 RETURNING *',
+    const { rows: dup } = await client.query(
+      'SELECT id FROM mirror_classes WHERE LOWER(name) = LOWER($1) AND id != $2',
       [name.trim(), id]
+    );
+    if (dup.length) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Duplicate' }); }
+    const { rows } = await client.query(
+      'UPDATE mirror_classes SET name=$1 WHERE id=$2 RETURNING *', [name.trim(), id]
     );
     if (!rows[0]) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Not found' }); }
     await client.query('DELETE FROM mirror_class_attributes WHERE class_id=$1', [id]);

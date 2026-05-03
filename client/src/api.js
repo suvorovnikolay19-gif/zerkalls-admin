@@ -22,9 +22,11 @@ export const uploadApi = {
 export const attributesApi = {
   getAll: () => api.get('/attributes'),
   create: (data) => api.post('/attributes', data),
+  update: (id, data) => api.put(`/attributes/${id}`, data),
   delete: (id) => api.delete(`/attributes/${id}`),
   reorder: (id, direction) => api.post(`/attributes/${id}/reorder`, { direction }),
   addValue: (attrId, data) => api.post(`/attributes/${attrId}/values`, data),
+  updateValue: (attrId, valueId, data) => api.put(`/attributes/${attrId}/values/${valueId}`, data),
   deleteValue: (attrId, valueId) => api.delete(`/attributes/${attrId}/values/${valueId}`),
 };
 
