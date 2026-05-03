@@ -6,12 +6,12 @@ export default function CharacteristicsEditor({ value, onChange, attributes = []
     onChange(next);
   };
 
-  const updateVal = (i, valId) => {
+  const updateVal = (i, text) => {
     const char = value[i];
     const attr = attributes.find((a) => a.id === char.attribute_id);
-    const av = attr?.values?.find((v) => v.id === valId);
+    const match = attr?.values?.find((v) => v.value === text);
     const next = [...value];
-    next[i] = { ...next[i], attribute_value_id: valId, value: av?.value || '' };
+    next[i] = { ...next[i], value: text, attribute_value_id: match?.id ?? null };
     onChange(next);
   };
 
@@ -26,6 +26,7 @@ export default function CharacteristicsEditor({ value, onChange, attributes = []
         <div className="char-rows">
           {value.map((char, i) => {
             const selAttr = attributes.find((a) => a.id === char.attribute_id);
+            const listId = `char-vals-${i}`;
             return (
               <div key={i} className="char-row">
                 <select
@@ -38,17 +39,23 @@ export default function CharacteristicsEditor({ value, onChange, attributes = []
                     <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
                 </select>
-                <select
-                  className="form-input form-select"
-                  value={char.attribute_value_id ?? ''}
-                  onChange={(e) => updateVal(i, e.target.value ? parseInt(e.target.value) : null)}
+
+                <input
+                  className="form-input"
+                  list={selAttr?.values?.length ? listId : undefined}
+                  placeholder={selAttr ? 'Значение...' : '—'}
+                  value={char.value}
                   disabled={!selAttr}
-                >
-                  <option value="">— значение —</option>
-                  {selAttr?.values?.map((v) => (
-                    <option key={v.id} value={v.id}>{v.value}</option>
-                  ))}
-                </select>
+                  onChange={(e) => updateVal(i, e.target.value)}
+                />
+                {selAttr?.values?.length > 0 && (
+                  <datalist id={listId}>
+                    {selAttr.values.map((v) => (
+                      <option key={v.id} value={v.value} />
+                    ))}
+                  </datalist>
+                )}
+
                 <button type="button" className="char-del" onClick={() => remove(i)} title="Удалить">
                   ✕
                 </button>
