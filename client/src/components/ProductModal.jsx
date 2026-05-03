@@ -1,40 +1,59 @@
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { productsApi } from '../api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { productsApi, attributesApi, mirrorClassesApi } from '../api';
 import { useToast } from '../ToastContext';
 import ImageUpload from './ImageUpload';
 import CharacteristicsEditor from './CharacteristicsEditor';
-
-const DEFAULT_CHARS = [
-  { name: 'Форма', value: '' },
-  { name: 'Тип подсветки', value: '' },
-  { name: 'Ширина подсвеченной области', value: '' },
-  { name: 'Зеркальный отступ', value: '' },
-  { name: 'Толщина зеркального полотна', value: '' },
-  { name: 'Общая толщина изделия', value: '' },
-  { name: 'Тип рамы', value: '' },
-  { name: 'Толщина рамы', value: '' },
-  { name: 'Тип крепления', value: '' },
-];
 
 export default function ProductModal({ product, onClose }) {
   const isEdit = !!product;
   const qc = useQueryClient();
   const toast = useToast();
 
+  const { data: attributes = [] } = useQuery({
+    queryKey: ['attributes'],
+    queryFn: () => attributesApi.getAll().then((r) => r.data),
+  });
+
+  const { data: mirrorClasses = [] } = useQuery({
+    queryKey: ['mirror-classes'],
+    queryFn: () => mirrorClassesApi.getAll().then((r) => r.data),
+  });
+
   const [name, setName] = useState(product?.name ?? '');
   const [price, setPrice] = useState(product?.price ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
-  const [images, setImages] = useState(
-    product?.images?.map((i) => i.filename) ?? []
-  );
+  const [classId, setClassId] = useState(product?.class_id ? String(product.class_id) : '');
+  const [images, setImages] = useState(product?.images?.map((i) => i.filename) ?? []);
   const [chars, setChars] = useState(
-    product?.characteristics?.length
-      ? product.characteristics.map((c) => ({ name: c.name, value: c.value }))
-      : DEFAULT_CHARS.map((c) => ({ ...c }))
+    product?.characteristics?.map((c) => ({
+      attribute_id: c.attribute_id ?? null,
+      attribute_value_id: c.attribute_value_id ?? null,
+      name: c.name,
+      value: c.value,
+    })) ?? []
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const handleClassChange = (newClassId) => {
+    setClassId(newClassId);
+    if (newClassId) {
+      const cls = mirrorClasses.find((c) => c.id === parseInt(newClassId));
+      if (cls) {
+        setChars(
+          cls.attributes.map((a) => ({
+            attribute_id: a.id,
+            attribute_value_id: null,
+            name: a.name,
+            value: '',
+          }))
+        );
+      }
+    } else {
+      setChars([]);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -45,8 +64,9 @@ export default function ProductModal({ product, onClose }) {
         name: name.trim(),
         description,
         price: parseFloat(price) || 0,
+        class_id: classId ? parseInt(classId) : null,
         images,
-        characteristics: chars.filter((c) => c.name.trim() && c.value.trim()),
+        characteristics: chars.filter((c) => c.name.trim() || c.attribute_id),
       };
       if (isEdit) {
         await productsApi.update(product.id, payload);
@@ -106,6 +126,20 @@ export default function ProductModal({ product, onClose }) {
             </div>
 
             <div className="form-group">
+              <label className="form-label">Класс зеркала</label>
+              <select
+                className="form-input form-select"
+                value={classId}
+                onChange={(e) => handleClassChange(e.target.value)}
+              >
+                <option value="">Без класса</option>
+                {mirrorClasses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
               <label className="form-label">Описание</label>
               <textarea
                 className="form-textarea"
@@ -123,7 +157,7 @@ export default function ProductModal({ product, onClose }) {
 
             <div>
               <div className="section-title">Характеристики</div>
-              <CharacteristicsEditor value={chars} onChange={setChars} />
+              <CharacteristicsEditor value={chars} onChange={setChars} attributes={attributes} />
             </div>
           </div>
 

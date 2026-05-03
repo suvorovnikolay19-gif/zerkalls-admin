@@ -11,7 +11,8 @@ const IMAGES_SUB = `
 `;
 const CHARS_SUB = `
   (SELECT COALESCE(JSON_AGG(
-    JSON_BUILD_OBJECT('id', pc.id, 'name', pc.name, 'value', pc.value, 'sort_order', pc.sort_order)
+    JSON_BUILD_OBJECT('id', pc.id, 'name', pc.name, 'value', pc.value, 'sort_order', pc.sort_order,
+      'attribute_id', pc.attribute_id, 'attribute_value_id', pc.attribute_value_id)
     ORDER BY pc.sort_order
   ), '[]') FROM product_characteristics pc WHERE pc.product_id = p.id)
 `;
@@ -89,11 +90,11 @@ router.post('/', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { name, description, price, images = [], characteristics = [] } = req.body;
+    const { name, description, price, class_id, images = [], characteristics = [] } = req.body;
 
     const { rows } = await client.query(
-      'INSERT INTO products (name, description, price) VALUES ($1, $2, $3) RETURNING *',
-      [name, description, parseFloat(price) || 0]
+      'INSERT INTO products (name, description, price, class_id) VALUES ($1, $2, $3, $4) RETURNING *',
+      [name, description, parseFloat(price) || 0, class_id || null]
     );
     const product = rows[0];
 
@@ -105,11 +106,11 @@ router.post('/', async (req, res) => {
     }
 
     for (let i = 0; i < characteristics.length; i++) {
-      const { name: n, value: v } = characteristics[i];
+      const { name: n, value: v, attribute_id, attribute_value_id } = characteristics[i];
       if (n && n.trim()) {
         await client.query(
-          'INSERT INTO product_characteristics (product_id, name, value, sort_order) VALUES ($1, $2, $3, $4)',
-          [product.id, n.trim(), v || '', i]
+          'INSERT INTO product_characteristics (product_id, name, value, sort_order, attribute_id, attribute_value_id) VALUES ($1, $2, $3, $4, $5, $6)',
+          [product.id, n.trim(), v || '', i, attribute_id || null, attribute_value_id || null]
         );
       }
     }
@@ -130,12 +131,12 @@ router.put('/:id', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { name, description, price, images = [], characteristics = [] } = req.body;
+    const { name, description, price, class_id, images = [], characteristics = [] } = req.body;
     const { id } = req.params;
 
     const { rows } = await client.query(
-      'UPDATE products SET name=$1, description=$2, price=$3 WHERE id=$4 RETURNING *',
-      [name, description, parseFloat(price) || 0, id]
+      'UPDATE products SET name=$1, description=$2, price=$3, class_id=$4 WHERE id=$5 RETURNING *',
+      [name, description, parseFloat(price) || 0, class_id || null, id]
     );
     if (!rows[0]) {
       await client.query('ROLLBACK');
@@ -152,11 +153,11 @@ router.put('/:id', async (req, res) => {
 
     await client.query('DELETE FROM product_characteristics WHERE product_id=$1', [id]);
     for (let i = 0; i < characteristics.length; i++) {
-      const { name: n, value: v } = characteristics[i];
+      const { name: n, value: v, attribute_id, attribute_value_id } = characteristics[i];
       if (n && n.trim()) {
         await client.query(
-          'INSERT INTO product_characteristics (product_id, name, value, sort_order) VALUES ($1, $2, $3, $4)',
-          [id, n.trim(), v || '', i]
+          'INSERT INTO product_characteristics (product_id, name, value, sort_order, attribute_id, attribute_value_id) VALUES ($1, $2, $3, $4, $5, $6)',
+          [id, n.trim(), v || '', i, attribute_id || null, attribute_value_id || null]
         );
       }
     }

@@ -27,6 +27,44 @@ CREATE INDEX IF NOT EXISTS idx_product_images_product_id ON product_images(produ
 CREATE INDEX IF NOT EXISTS idx_product_chars_product_id ON product_characteristics(product_id);
 CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at DESC);
 
+-- ===== ATTRIBUTES SYSTEM =====
+CREATE TABLE IF NOT EXISTS attributes (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  priority INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS attribute_values (
+  id SERIAL PRIMARY KEY,
+  attribute_id INTEGER NOT NULL REFERENCES attributes(id) ON DELETE CASCADE,
+  value VARCHAR(255) NOT NULL,
+  sort_order INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS mirror_classes (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS mirror_class_attributes (
+  id SERIAL PRIMARY KEY,
+  class_id INTEGER NOT NULL REFERENCES mirror_classes(id) ON DELETE CASCADE,
+  attribute_id INTEGER NOT NULL REFERENCES attributes(id) ON DELETE CASCADE,
+  sort_order INTEGER DEFAULT 0,
+  UNIQUE(class_id, attribute_id)
+);
+
+-- Nullable additions to existing tables (preserve all existing data)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS class_id INTEGER REFERENCES mirror_classes(id) ON DELETE SET NULL;
+ALTER TABLE product_characteristics ADD COLUMN IF NOT EXISTS attribute_id INTEGER REFERENCES attributes(id) ON DELETE SET NULL;
+ALTER TABLE product_characteristics ADD COLUMN IF NOT EXISTS attribute_value_id INTEGER REFERENCES attribute_values(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_attributes_priority ON attributes(priority);
+CREATE INDEX IF NOT EXISTS idx_attribute_values_attr_id ON attribute_values(attribute_id);
+CREATE INDEX IF NOT EXISTS idx_mirror_class_attrs_class_id ON mirror_class_attributes(class_id);
+
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
