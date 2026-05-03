@@ -484,6 +484,31 @@ input[type="number"] { -moz-appearance: textfield; }
   .product-grid, .skeleton-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
   .form-row { grid-template-columns: 1fr; }
 }
+@media (max-width: 640px) {
+  .header {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 0.65rem 1.25rem;
+    gap: 0;
+    align-items: center;
+  }
+  .header-logo {
+    flex: 1;
+    order: 1;
+  }
+  .header > .btn {
+    order: 2;
+    flex-shrink: 0;
+  }
+  .header-tabs {
+    position: static;
+    transform: none;
+    order: 3;
+    flex: 0 0 100%;
+    justify-content: center;
+    padding: 0.4rem 0 0.2rem;
+  }
+}
 @media (max-width: 500px) {
   .modal-overlay { padding: 0; align-items: flex-end; }
   .modal { border-radius: var(--radius-card) var(--radius-card) 0 0; max-height: 95vh; }
