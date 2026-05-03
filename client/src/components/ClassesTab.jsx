@@ -14,6 +14,7 @@ export default function ClassesTab() {
   const [selectedAttrs, setSelectedAttrs] = useState([]);
   const [saveError, setSaveError] = useState('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [pendingDeleteClass, setPendingDeleteClass] = useState(null);
 
   const { data: attributes = [] } = useQuery({
     queryKey: ['attributes'],
@@ -26,19 +27,14 @@ export default function ClassesTab() {
   });
 
   const saveClass = useMutation({
-    mutationFn: (data) =>
-      editId ? mirrorClassesApi.update(editId, data) : mirrorClassesApi.create(data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['mirror-classes'] });
-      toast(editId ? 'Класс обновлён' : 'Класс создан');
-      resetForm();
-    },
+    mutationFn: (data) => editId ? mirrorClassesApi.update(editId, data) : mirrorClassesApi.create(data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['mirror-classes'] }); toast(editId ? 'Класс обновлён' : 'Класс создан'); resetForm(); },
     onError: () => setSaveError('Класс с таким названием уже существует'),
   });
 
   const deleteClass = useMutation({
     mutationFn: (id) => mirrorClassesApi.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['mirror-classes'] }); toast('Класс удалён'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['mirror-classes'] }); setPendingDeleteClass(null); toast('Класс удалён'); },
   });
 
   const isDirty = editId
@@ -47,53 +43,19 @@ export default function ClassesTab() {
         JSON.stringify([...(classes.find((c) => c.id === editId)?.attributes.map((a) => a.id) ?? [])].sort())
     : formName.trim() !== '' || selectedAttrs.length > 0;
 
-  const openCreate = () => {
-    setEditId(null);
-    setFormName('');
-    setSelectedAttrs([]);
-    setSaveError('');
-    setShowCancelConfirm(false);
-    setShowForm(true);
-  };
+  const openCreate = () => { setEditId(null); setFormName(''); setSelectedAttrs([]); setSaveError(''); setShowCancelConfirm(false); setShowForm(true); };
+  const openEdit = (cls) => { setEditId(cls.id); setFormName(cls.name); setSelectedAttrs(cls.attributes.map((a) => a.id)); setSaveError(''); setShowCancelConfirm(false); setShowForm(true); };
+  const tryCancel = () => { if (isDirty) { setShowCancelConfirm(true); } else { resetForm(); } };
+  const resetForm = () => { setShowForm(false); setEditId(null); setFormName(''); setSelectedAttrs([]); setSaveError(''); setShowCancelConfirm(false); };
 
-  const openEdit = (cls) => {
-    setEditId(cls.id);
-    setFormName(cls.name);
-    setSelectedAttrs(cls.attributes.map((a) => a.id));
-    setSaveError('');
-    setShowCancelConfirm(false);
-    setShowForm(true);
-  };
-
-  const tryCancel = () => {
-    if (isDirty) {
-      setShowCancelConfirm(true);
-    } else {
-      resetForm();
-    }
-  };
-
-  const resetForm = () => {
-    setShowForm(false);
-    setEditId(null);
-    setFormName('');
-    setSelectedAttrs([]);
-    setSaveError('');
-    setShowCancelConfirm(false);
-  };
-
-  const toggleAttr = (id) =>
-    setSelectedAttrs((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+  const toggleAttr = (id) => setSelectedAttrs((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
 
   const handleSave = () => {
     const name = formName.trim();
     if (!name) return;
-    const dup = classes.some(
-      (c) => c.name.toLowerCase() === name.toLowerCase() && c.id !== editId
-    );
-    if (dup) { setSaveError('Класс с таким названием уже существует'); return; }
+    if (classes.some((c) => c.name.toLowerCase() === name.toLowerCase() && c.id !== editId)) {
+      setSaveError('Класс с таким названием уже существует'); return;
+    }
     setSaveError('');
     saveClass.mutate({ name, attribute_ids: selectedAttrs });
   };
@@ -109,9 +71,7 @@ export default function ClassesTab() {
       <div className="tab-toolbar">
         <h2 className="tab-heading">Классы зеркал</h2>
         {!showForm && (
-          <button className="btn btn-primary" onClick={openCreate}>
-            + Создать класс
-          </button>
+          <button className="btn btn-primary" onClick={openCreate}>+ Создать класс</button>
         )}
       </div>
 
@@ -137,11 +97,7 @@ export default function ClassesTab() {
               <div className="attr-check-list">
                 {attributes.map((attr, idx) => (
                   <label key={attr.id} className="attr-check-item">
-                    <input
-                      type="checkbox"
-                      checked={selectedAttrs.includes(attr.id)}
-                      onChange={() => toggleAttr(attr.id)}
-                    />
+                    <input type="checkbox" checked={selectedAttrs.includes(attr.id)} onChange={() => toggleAttr(attr.id)} />
                     <span className="attr-check-num">{idx + 1}</span>
                     <span>{attr.name}</span>
                   </label>
@@ -151,26 +107,15 @@ export default function ClassesTab() {
           </div>
 
           {showCancelConfirm ? (
-            <div className="confirm-bar">
+            <div className="confirm-bar" style={{ marginTop: '1.25rem', borderRadius: 'var(--radius)' }}>
               <span>Изменения не сохранятся. Прервать?</span>
-              <button className="btn btn-secondary btn-sm" onClick={() => setShowCancelConfirm(false)}>
-                Продолжить
-              </button>
-              <button className="btn btn-danger btn-sm" onClick={resetForm}>
-                Да, прервать
-              </button>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowCancelConfirm(false)}>Продолжить</button>
+              <button className="btn btn-danger btn-sm" onClick={resetForm}>Да, прервать</button>
             </div>
           ) : (
             <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={tryCancel}>
-                Отмена
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={!formName.trim() || saveClass.isPending}
-                onClick={handleSave}
-              >
+              <button type="button" className="btn btn-secondary" onClick={tryCancel}>Отмена</button>
+              <button type="button" className="btn btn-primary" disabled={!formName.trim() || saveClass.isPending} onClick={handleSave}>
                 {saveClass.isPending ? 'Сохранение...' : editId ? 'Сохранить' : 'Создать'}
               </button>
             </div>
@@ -180,12 +125,7 @@ export default function ClassesTab() {
 
       {classes.length > 0 && !showForm && (
         <div className="tab-search-wrap">
-          <input
-            className="form-input search-input tab-search"
-            placeholder="Поиск классов..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <input className="form-input tab-search" placeholder="Поиск классов..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       )}
 
@@ -206,24 +146,23 @@ export default function ClassesTab() {
                   {cls.attributes.length === 0 ? (
                     <span className="attr-tag attr-tag-empty">без характеристик</span>
                   ) : (
-                    cls.attributes.map((a) => (
-                      <span key={a.id} className="attr-tag">{a.name}</span>
-                    ))
+                    cls.attributes.map((a) => <span key={a.id} className="attr-tag">{a.name}</span>)
                   )}
                 </div>
               </div>
-              <div className="class-actions">
-                <button className="btn btn-secondary btn-sm" onClick={() => openEdit(cls)}>
-                  Изменить
-                </button>
-                <button
-                  className="btn btn-danger btn-sm"
-                  onClick={() => deleteClass.mutate(cls.id)}
-                  disabled={deleteClass.isPending}
-                >
-                  Удалить
-                </button>
-              </div>
+
+              {pendingDeleteClass === cls.id ? (
+                <div className="inline-confirm">
+                  <span>Удалить «{cls.name}»?</span>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setPendingDeleteClass(null)}>Нет</button>
+                  <button className="btn btn-danger btn-sm" disabled={deleteClass.isPending} onClick={() => deleteClass.mutate(cls.id)}>Да</button>
+                </div>
+              ) : (
+                <div className="class-actions">
+                  <button className="btn btn-secondary btn-sm" onClick={() => openEdit(cls)}>Изменить</button>
+                  <button className="btn btn-danger btn-sm" onClick={() => setPendingDeleteClass(cls.id)}>Удалить</button>
+                </div>
+              )}
             </div>
           ))}
         </div>

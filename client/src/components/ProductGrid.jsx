@@ -57,8 +57,7 @@ export default function ProductGrid({ onEdit }) {
     return () => obs.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const handleDelete = async (id, name) => {
-    if (!confirm(`Удалить "${name}"?`)) return;
+  const handleDelete = async (id) => {
     try {
       await productsApi.delete(id);
       qc.invalidateQueries({ queryKey: ['products'] });
@@ -111,7 +110,7 @@ export default function ProductGrid({ onEdit }) {
                 key={p.id}
                 product={p}
                 onEdit={() => onEdit(p)}
-                onDelete={() => handleDelete(p.id, p.name)}
+                onDelete={() => handleDelete(p.id)}
               />
             ))}
           </div>
