@@ -83,16 +83,22 @@ router.post('/:id/reorder', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { rows: cur } = await client.query('SELECT * FROM attributes WHERE id=$1', [req.params.id]);
-    if (!cur[0]) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Not found' }); }
-    const q = direction === 'up'
-      ? 'SELECT * FROM attributes WHERE priority < $1 ORDER BY priority DESC LIMIT 1'
-      : 'SELECT * FROM attributes WHERE priority > $1 ORDER BY priority ASC LIMIT 1';
-    const { rows: nbr } = await client.query(q, [cur[0].priority]);
-    if (nbr[0]) {
-      await client.query('UPDATE attributes SET priority=$1 WHERE id=$2', [nbr[0].priority, cur[0].id]);
-      await client.query('UPDATE attributes SET priority=$1 WHERE id=$2', [cur[0].priority, nbr[0].id]);
+
+    // Load full ordered list, then swap positions and reassign sequential priorities
+    const { rows: all } = await client.query(
+      'SELECT id FROM attributes ORDER BY priority, id'
+    );
+    const idx = all.findIndex((a) => a.id === parseInt(req.params.id));
+    if (idx === -1) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Not found' }); }
+
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx >= 0 && targetIdx < all.length) {
+      [all[idx], all[targetIdx]] = [all[targetIdx], all[idx]];
+      for (let i = 0; i < all.length; i++) {
+        await client.query('UPDATE attributes SET priority=$1 WHERE id=$2', [i, all[i].id]);
+      }
     }
+
     await client.query('COMMIT');
     res.json({ ok: true });
   } catch (err) {
