@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 function findNode(nodes, id) {
   for (const n of nodes) {
@@ -23,80 +24,174 @@ function pathString(nodes, id) {
   return ids.map((pid) => findNode(nodes, pid)?.value || '').join(' › ');
 }
 
-function CascadeSelect({ values, selectedId, onChange }) {
-  if (!values || values.length === 0) return null;
-  const pathIds = selectedId ? (getPathIds(values, selectedId) || []) : [];
-  const levels = [];
-  let current = values;
-  for (let i = 0; ; i++) {
-    if (current.length === 0) break;
-    const sel = pathIds[i] ?? null;
-    levels.push({ options: current, selectedId: sel });
-    if (sel == null) break;
-    const node = current.find((n) => n.id === sel);
-    current = node?.children || [];
-    if (current.length === 0) break;
+function flattenTree(nodes, prefix = '') {
+  const items = [];
+  for (const n of nodes) {
+    const label = prefix ? `${prefix} › ${n.value}` : n.value;
+    items.push({ id: n.id, label });
+    if (n.children?.length) items.push(...flattenTree(n.children, label));
   }
+  return items;
+}
+
+function FlyoutItem({ node, onSelect }) {
+  const [subOpen, setSubOpen] = useState(false);
+  const [subPos, setSubPos] = useState({ top: 0, left: 0 });
+  const itemRef = useRef(null);
+  const closeTimer = useRef(null);
+  const hasChildren = (node.children || []).length > 0;
+
+  const clearClose = () => { if (closeTimer.current) clearTimeout(closeTimer.current); };
+  const scheduleClose = () => { closeTimer.current = setTimeout(() => setSubOpen(false), 180); };
+
+  const showSub = () => {
+    clearClose();
+    if (itemRef.current) {
+      const r = itemRef.current.getBoundingClientRect();
+      setSubPos({ top: r.top - 4, left: r.right + 4 });
+    }
+    setSubOpen(true);
+  };
+
+  useEffect(() => () => clearClose(), []);
+
   return (
-    <div className="cascade-select">
-      {levels.map((level, i) => (
-        <select
-          key={i}
-          className="form-input form-select cascade-level"
-          value={level.selectedId ?? ''}
-          onChange={(e) => {
-            const newId = e.target.value ? parseInt(e.target.value) : null;
-            const newPath = pathIds.slice(0, i).concat(newId ? [newId] : []);
-            onChange(newPath.length > 0 ? newPath[newPath.length - 1] : null);
-          }}
+    <>
+      <div
+        ref={itemRef}
+        className={`val-dropdown-item${subOpen ? ' active' : ''}`}
+        onMouseEnter={() => { if (hasChildren) showSub(); else clearClose(); }}
+        onMouseLeave={() => { if (hasChildren) scheduleClose(); }}
+        onClick={() => onSelect(node.id)}
+        data-picker
+      >
+        <span className="val-item-text">{node.value}</span>
+        {hasChildren && <span className="val-item-arrow">›</span>}
+      </div>
+      {subOpen && hasChildren && createPortal(
+        <div
+          className="val-picker-dropdown"
+          style={{ position: 'fixed', top: subPos.top, left: subPos.left, minWidth: 200 }}
+          onMouseEnter={clearClose}
+          onMouseLeave={scheduleClose}
+          data-picker
         >
-          <option value="">— выбрать —</option>
-          {level.options.map((v) => (
-            <option key={v.id} value={v.id}>{v.value}</option>
+          {node.children.map((child) => (
+            <FlyoutItem key={child.id} node={child} onSelect={onSelect} />
           ))}
-        </select>
-      ))}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+function ValueFlyoutPicker({ values, selectedId, selectedText, onSelectId, onSelectText, isStrict }) {
+  const [open, setOpen] = useState(false);
+  const [dropPos, setDropPos] = useState({ top: 0, left: 0, width: 0 });
+  const [query, setQuery] = useState('');
+  const inputRef = useRef(null);
+
+  const displayLabel = selectedId ? pathString(values, selectedId) : (selectedText || '');
+  const allFlat = flattenTree(values);
+  const filtered = query
+    ? allFlat.filter((item) => item.label.toLowerCase().includes(query.toLowerCase()))
+    : [];
+
+  const openDrop = () => {
+    if (inputRef.current) {
+      const r = inputRef.current.getBoundingClientRect();
+      setDropPos({ top: r.bottom + 3, left: r.left, width: r.width });
+    }
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (!e.target.closest('[data-picker]')) {
+        setOpen(false);
+        setQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const handleSelect = (id) => {
+    onSelectId(id);
+    setOpen(false);
+    setQuery('');
+  };
+
+  return (
+    <div className="val-picker" data-picker>
+      <input
+        ref={inputRef}
+        className="form-input val-picker-input"
+        placeholder="Значение..."
+        value={open ? query : displayLabel}
+        onFocus={openDrop}
+        onClick={openDrop}
+        onChange={(e) => {
+          const t = e.target.value;
+          setQuery(t);
+          setOpen(true);
+          if (!isStrict) onSelectText(t);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') { setOpen(false); setQuery(''); }
+          if (e.key === 'Enter' && query && filtered.length > 0) handleSelect(filtered[0].id);
+        }}
+        data-picker
+      />
+      {open && createPortal(
+        <div
+          className="val-picker-dropdown"
+          style={{ position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width }}
+          data-picker
+        >
+          {query ? (
+            filtered.length > 0 ? (
+              filtered.map((item) => (
+                <div
+                  key={item.id}
+                  className="val-dropdown-item"
+                  onClick={() => handleSelect(item.id)}
+                  data-picker
+                >
+                  <span className="val-item-text">{item.label}</span>
+                </div>
+              ))
+            ) : (
+              <div className="val-dropdown-empty">Нет совпадений</div>
+            )
+          ) : values.length > 0 ? (
+            values.map((v) => (
+              <FlyoutItem key={v.id} node={v} onSelect={handleSelect} />
+            ))
+          ) : (
+            <div className="val-dropdown-empty">Нет вариантов</div>
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
 
 export default function CharacteristicsEditor({ value, onChange, attributes = [] }) {
-  // customRows: indices of rows in "free text" mode (for non-strict attrs with tree values)
-  const [customRows, setCustomRows] = useState(() => {
-    const s = new Set();
-    value.forEach((c, i) => {
-      if (c.attribute_value_id == null && c.value && c.value.trim()) s.add(i);
-    });
-    return s;
-  });
-
-  // attrs already used (by attribute_id) across all rows
   const usedAttrIds = new Set(value.map((c) => c.attribute_id).filter(Boolean));
 
-  // available attrs for a given row index: unused attrs + current row's own attr
   const availableAttrs = (i) => {
     const currId = value[i]?.attribute_id;
     return attributes.filter((a) => !usedAttrIds.has(a.id) || a.id === currId);
   };
 
-  const shiftCustomRows = (afterIdx, delta) => {
-    setCustomRows((prev) => {
-      const s = new Set();
-      prev.forEach((idx) => {
-        if (delta > 0) s.add(idx <= afterIdx ? idx : idx + 1);
-        else s.add(idx < afterIdx ? idx : idx > afterIdx ? idx - 1 : null);
-      });
-      s.delete(null);
-      return s;
-    });
-  };
-
   const updateAttr = (i, attrId) => {
     const attr = attributes.find((a) => a.id === attrId);
     const next = [...value];
-    next[i] = { ...next[i], attribute_id: attrId, attribute_value_id: null, name: attr?.name || '', value: '' };
-    // leaving custom mode when changing attr
-    setCustomRows((prev) => { const s = new Set(prev); s.delete(i); return s; });
+    next[i] = { attribute_id: attrId, attribute_value_id: null, name: attr?.name || '', value: '' };
     onChange(next);
   };
 
@@ -104,44 +199,27 @@ export default function CharacteristicsEditor({ value, onChange, attributes = []
     const char = value[i];
     const attr = attributes.find((a) => a.id === char.attribute_id);
     const next = [...value];
-    next[i] = { ...next[i], attribute_value_id: valueId, value: valueId ? pathString(attr?.values || [], valueId) : '' };
+    next[i] = {
+      ...next[i],
+      attribute_value_id: valueId,
+      value: valueId ? pathString(attr?.values || [], valueId) : '',
+    };
     onChange(next);
   };
 
-  const updateCustomText = (i, text) => {
+  const updateText = (i, text) => {
     const next = [...value];
     next[i] = { ...next[i], value: text, attribute_value_id: null };
     onChange(next);
   };
 
-  const toggleCustom = (i) => {
-    const isCustom = customRows.has(i);
-    if (isCustom) {
-      setCustomRows((prev) => { const s = new Set(prev); s.delete(i); return s; });
-      const next = [...value];
-      next[i] = { ...next[i], value: '', attribute_value_id: null };
-      onChange(next);
-    } else {
-      setCustomRows((prev) => new Set([...prev, i]));
-      const next = [...value];
-      next[i] = { ...next[i], attribute_value_id: null, value: '' };
-      onChange(next);
-    }
-  };
+  const remove = (i) => { onChange(value.filter((_, idx) => idx !== i)); };
 
-  const remove = (i) => {
-    shiftCustomRows(i, -1);
-    onChange(value.filter((_, idx) => idx !== i));
-  };
-
-  // Add another value row for the same attribute, inserted right after row i
   const addAnotherValue = (i) => {
     const char = value[i];
     if (!char.attribute_id) return;
     const newRow = { attribute_id: char.attribute_id, attribute_value_id: null, name: char.name, value: '' };
-    const next = [...value.slice(0, i + 1), newRow, ...value.slice(i + 1)];
-    shiftCustomRows(i, 1);
-    onChange(next);
+    onChange([...value.slice(0, i + 1), newRow, ...value.slice(i + 1)]);
   };
 
   const add = () => {
@@ -153,68 +231,45 @@ export default function CharacteristicsEditor({ value, onChange, attributes = []
       {value.length > 0 && (
         <div className="char-rows">
           {value.map((char, i) => {
+            const isCont = i > 0 && char.attribute_id != null && char.attribute_id === value[i - 1]?.attribute_id;
             const selAttr = attributes.find((a) => a.id === char.attribute_id);
             const hasValues = (selAttr?.values || []).length > 0;
             const isStrict = selAttr?.strict_values ?? false;
-            const isCustom = !isStrict && hasValues && customRows.has(i);
-            // detect loaded-product custom values: has a value text but no tree id, attr has tree values
-            const effectiveCustom = isCustom || (!isStrict && hasValues && !char.attribute_value_id && !!char.value);
 
             return (
-              <div key={i} className="char-row">
-                <select
-                  className="form-input form-select char-row-attr"
-                  value={char.attribute_id ?? ''}
-                  onChange={(e) => updateAttr(i, e.target.value ? parseInt(e.target.value) : null)}
-                >
-                  <option value="">— характеристика —</option>
-                  {availableAttrs(i).map((a) => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
-                  ))}
-                </select>
+              <div key={i} className={`char-row${isCont ? ' char-row-cont' : ''}`}>
+                {isCont ? (
+                  <div className="char-row-attr char-row-attr-cont">—</div>
+                ) : (
+                  <select
+                    className="form-input form-select char-row-attr"
+                    value={char.attribute_id ?? ''}
+                    onChange={(e) => updateAttr(i, e.target.value ? parseInt(e.target.value) : null)}
+                  >
+                    <option value="">— характеристика —</option>
+                    {availableAttrs(i).map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                )}
 
                 <div className="char-row-val">
                   {selAttr && hasValues ? (
-                    effectiveCustom ? (
-                      <>
-                        <input
-                          className="form-input"
-                          placeholder="Своё значение..."
-                          value={char.value}
-                          autoFocus
-                          onChange={(e) => updateCustomText(i, e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          className="char-mode-toggle"
-                          onClick={() => toggleCustom(i)}
-                          title="Выбрать из вариантов"
-                        >↩</button>
-                      </>
-                    ) : (
-                      <>
-                        <CascadeSelect
-                          values={selAttr.values}
-                          selectedId={char.attribute_value_id}
-                          onChange={(vid) => updateVal(i, vid)}
-                        />
-                        {!isStrict && (
-                          <button
-                            type="button"
-                            className="char-mode-toggle"
-                            onClick={() => toggleCustom(i)}
-                            title="Ввести своё значение"
-                          >✏</button>
-                        )}
-                      </>
-                    )
+                    <ValueFlyoutPicker
+                      values={selAttr.values}
+                      selectedId={char.attribute_value_id}
+                      selectedText={char.value}
+                      onSelectId={(id) => updateVal(i, id)}
+                      onSelectText={(text) => updateText(i, text)}
+                      isStrict={isStrict}
+                    />
                   ) : (
                     <input
                       className="form-input"
                       placeholder={selAttr ? (isStrict ? 'Нет вариантов' : 'Значение...') : '—'}
                       value={char.value}
                       disabled={!selAttr || isStrict}
-                      onChange={(e) => updateCustomText(i, e.target.value)}
+                      onChange={(e) => updateText(i, e.target.value)}
                     />
                   )}
                 </div>
