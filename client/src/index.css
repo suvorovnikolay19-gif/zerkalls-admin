@@ -281,15 +281,48 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 
 /* ===== CHARACTERISTICS ===== */
-.char-rows { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.65rem; }
-.char-row { display: grid; grid-template-columns: 1fr 1fr 28px; gap: 0.4rem; align-items: center; }
+.char-rows { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.65rem; }
+.char-row { display: flex; align-items: flex-start; gap: 0.4rem; flex-wrap: wrap; }
+.char-row-attr { flex: 0 0 190px; min-width: 0; }
 .char-del {
   width: 28px; height: 32px; border-radius: var(--radius);
   background: transparent; border: none; cursor: pointer;
   color: var(--fg3); display: flex; align-items: center; justify-content: center;
-  font-size: 0.75rem; transition: all var(--t); flex-shrink: 0;
+  font-size: 0.75rem; transition: all var(--t); flex-shrink: 0; margin-top: 1px;
 }
 .char-del:hover { background: var(--danger-light); color: var(--danger); }
+
+/* Cascade select */
+.cascade-select { display: flex; flex-wrap: wrap; gap: 0.3rem; flex: 1; }
+.cascade-level { flex: 1; min-width: 110px; }
+
+/* Char row value cell */
+.char-row-val { flex: 1; min-width: 160px; display: flex; align-items: center; gap: 0.25rem; }
+.char-row-val .form-input { flex: 1; }
+
+/* Custom/cascade mode toggle */
+.char-mode-toggle {
+  flex-shrink: 0; width: 26px; height: 32px;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--fg3); font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius); transition: color var(--t), background var(--t);
+}
+.char-mode-toggle:hover { color: var(--accent); background: var(--accent-light); }
+
+/* Add-another-value button */
+.char-add-val {
+  flex-shrink: 0; width: 28px; height: 32px;
+  background: transparent; border: 1px solid var(--border-strong); cursor: pointer;
+  color: var(--fg3); font-size: 15px; font-weight: 500; border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  transition: all var(--t);
+}
+.char-add-val:hover:not(:disabled) { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+.char-add-val:disabled { opacity: 0.25; cursor: not-allowed; }
+
+/* Strict lock toggle in attr header */
+.strict-on { color: var(--accent) !important; }
 
 /* ===== TOASTS ===== */
 .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 300; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
@@ -405,7 +438,7 @@ input[type="number"] { -moz-appearance: textfield; }
 .attr-value-actions { display: flex; gap: 2px; flex-shrink: 0; }
 .attr-val-edit-input { flex: 1; height: 28px; padding: 0.2rem 0.5rem; font-size: 13px; }
 .attr-add-value {
-  display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;
+  display: flex; align-items: center; gap: 0.5rem;
 }
 .attr-add-value .form-input { flex: 1; }
 .check-add-btn {
@@ -414,6 +447,20 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 .check-add-btn:not(:disabled):hover { background: rgba(48, 164, 108, 0.1); border-color: rgba(48, 164, 108, 0.3); }
 .check-add-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* Value tree */
+.value-tree-child {
+  padding-left: 20px; margin-top: 3px;
+  display: flex; flex-direction: column; gap: 0.3rem;
+}
+.value-tree-toggle {
+  width: 18px; height: 18px; flex-shrink: 0;
+  background: transparent; border: none; cursor: pointer;
+  font-size: 11px; color: var(--fg3); padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 3px; transition: background var(--t), color var(--t);
+}
+.value-tree-toggle:hover { background: var(--bg2); color: var(--fg); }
 
 /* ===== CLASSES TAB ===== */
 .class-form {

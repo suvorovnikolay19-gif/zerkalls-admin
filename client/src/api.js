@@ -23,6 +23,7 @@ export const attributesApi = {
   getAll: () => api.get('/attributes'),
   create: (data) => api.post('/attributes', data),
   update: (id, data) => api.put(`/attributes/${id}`, data),
+  setStrict: (id, strict_values) => api.patch(`/attributes/${id}`, { strict_values }),
   delete: (id) => api.delete(`/attributes/${id}`),
   reorder: (id, direction) => api.post(`/attributes/${id}/reorder`, { direction }),
   addValue: (attrId, data) => api.post(`/attributes/${attrId}/values`, data),

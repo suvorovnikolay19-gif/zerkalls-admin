@@ -2,17 +2,19 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db/pool');
 
+function buildTree(rows, attrId, parentId = null) {
+  return rows
+    .filter((r) => r.attribute_id === attrId && r.parent_id == parentId)
+    .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
+    .map((r) => ({ ...r, children: buildTree(rows, attrId, r.id) }));
+}
+
 // GET /api/attributes
 router.get('/', async (req, res) => {
   try {
     const { rows: attrs } = await pool.query('SELECT * FROM attributes ORDER BY priority, id');
-    const { rows: vals } = await pool.query(
-      'SELECT * FROM attribute_values ORDER BY attribute_id, sort_order, id'
-    );
-    const map = {};
-    for (const a of attrs) map[a.id] = { ...a, values: [] };
-    for (const v of vals) if (map[v.attribute_id]) map[v.attribute_id].values.push(v);
-    res.json(Object.values(map));
+    const { rows: vals } = await pool.query('SELECT * FROM attribute_values ORDER BY sort_order, id');
+    res.json(attrs.map((a) => ({ ...a, values: buildTree(vals, a.id) })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -31,10 +33,9 @@ router.post('/', async (req, res) => {
     const { rows: maxRows } = await pool.query(
       'SELECT COALESCE(MAX(priority), -1) AS mp FROM attributes'
     );
-    const priority = maxRows[0].mp + 1;
     const { rows } = await pool.query(
       'INSERT INTO attributes (name, priority) VALUES ($1, $2) RETURNING *',
-      [name.trim(), priority]
+      [name.trim(), Number(maxRows[0].mp) + 1]
     );
     res.status(201).json({ ...rows[0], values: [] });
   } catch (err) {
@@ -77,18 +78,31 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// PATCH /api/attributes/:id — toggle strict_values
+router.patch('/:id', async (req, res) => {
+  try {
+    const { strict_values } = req.body;
+    const { rows } = await pool.query(
+      'UPDATE attributes SET strict_values=$1 WHERE id=$2 RETURNING *',
+      [Boolean(strict_values), req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/attributes/:id/reorder
 router.post('/:id/reorder', async (req, res) => {
   const { direction } = req.body;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-
-    // Load full ordered list, then swap positions and reassign sequential priorities
-    const { rows: all } = await client.query(
-      'SELECT id FROM attributes ORDER BY priority, id'
-    );
-    const idx = all.findIndex((a) => a.id === parseInt(req.params.id));
+    const { rows: all } = await client.query('SELECT id FROM attributes ORDER BY priority, id');
+    const targetId = Number(req.params.id);
+    const idx = all.findIndex((a) => Number(a.id) === targetId);
     if (idx === -1) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Not found' }); }
 
     const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
@@ -110,28 +124,29 @@ router.post('/:id/reorder', async (req, res) => {
   }
 });
 
-// POST /api/attributes/:id/values
+// POST /api/attributes/:id/values  — parent_id optional for tree
 router.post('/:id/values', async (req, res) => {
   try {
-    const { value } = req.body;
+    const { value, parent_id } = req.body;
     if (!value?.trim()) return res.status(400).json({ error: 'Value required' });
+    const pid = parent_id != null ? Number(parent_id) : null;
     const { rows: maxRows } = await pool.query(
-      'SELECT COALESCE(MAX(sort_order), -1) AS ms FROM attribute_values WHERE attribute_id=$1',
-      [req.params.id]
+      `SELECT COALESCE(MAX(sort_order), -1) AS ms FROM attribute_values
+       WHERE attribute_id=$1 AND parent_id IS NOT DISTINCT FROM $2`,
+      [req.params.id, pid]
     );
-    const sort_order = maxRows[0].ms + 1;
     const { rows } = await pool.query(
-      'INSERT INTO attribute_values (attribute_id, value, sort_order) VALUES ($1, $2, $3) RETURNING *',
-      [req.params.id, value.trim(), sort_order]
+      'INSERT INTO attribute_values (attribute_id, value, sort_order, parent_id) VALUES ($1,$2,$3,$4) RETURNING *',
+      [req.params.id, value.trim(), Number(maxRows[0].ms) + 1, pid]
     );
-    res.status(201).json(rows[0]);
+    res.status(201).json({ ...rows[0], children: [] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// PUT /api/attributes/:id/values/:vid — rename value
+// PUT /api/attributes/:id/values/:vid
 router.put('/:id/values/:vid', async (req, res) => {
   try {
     const { value } = req.body;
@@ -148,7 +163,7 @@ router.put('/:id/values/:vid', async (req, res) => {
   }
 });
 
-// DELETE /api/attributes/:id/values/:vid
+// DELETE /api/attributes/:id/values/:vid  — cascades to children via FK
 router.delete('/:id/values/:vid', async (req, res) => {
   try {
     const { rowCount } = await pool.query(

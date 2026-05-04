@@ -172,6 +172,7 @@ export default function ProductModal({ product, onClose }) {
             <div>
               <div className="section-title">Характеристики</div>
               <CharacteristicsEditor
+                key={classId}
                 value={chars}
                 onChange={(v) => { setChars(v); touch(); }}
                 attributes={attributes}

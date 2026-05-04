@@ -65,6 +65,9 @@ CREATE INDEX IF NOT EXISTS idx_attributes_priority ON attributes(priority);
 CREATE INDEX IF NOT EXISTS idx_attribute_values_attr_id ON attribute_values(attribute_id);
 CREATE INDEX IF NOT EXISTS idx_mirror_class_attrs_class_id ON mirror_class_attributes(class_id);
 
+ALTER TABLE attribute_values ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES attribute_values(id) ON DELETE CASCADE;
+ALTER TABLE attributes ADD COLUMN IF NOT EXISTS strict_values BOOLEAN DEFAULT false;
+
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN

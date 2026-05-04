@@ -10,6 +10,28 @@ const EditIcon = () => (
   </svg>
 );
 
+const PlusChildIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+);
+
+const LockIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+);
+
+const UnlockIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+  </svg>
+);
+
+function countAll(nodes) {
+  return nodes.reduce((s, n) => s + 1 + countAll(n.children || []), 0);
+}
+
 export default function AttributesTab() {
   const qc = useQueryClient();
   const toast = useToast();
@@ -18,16 +40,18 @@ export default function AttributesTab() {
   const [newAttrName, setNewAttrName] = useState('');
   const [addError, setAddError] = useState('');
   const [expanded, setExpanded] = useState({});
-  const [newValues, setNewValues] = useState({});
+  const [expandedValues, setExpandedValues] = useState({});
 
-  // Inline editing
-  const [editingAttr, setEditingAttr] = useState(null);   // {id, value}
+  // Single "add value" form: {attrId, parentId: null|number}
+  const [addingFor, setAddingFor] = useState(null);
+  const [addingText, setAddingText] = useState('');
+
+  const [editingAttr, setEditingAttr] = useState(null);
   const [editAttrError, setEditAttrError] = useState('');
   const [editingValue, setEditingValue] = useState(null); // {attrId, valueId, value}
 
-  // Delete confirmations
-  const [pendingDeleteAttr, setPendingDeleteAttr] = useState(null);   // attr.id
-  const [pendingDeleteValue, setPendingDeleteValue] = useState(null); // {attrId, valueId}
+  const [pendingDeleteAttr, setPendingDeleteAttr] = useState(null);
+  const [pendingDeleteValue, setPendingDeleteValue] = useState(null); // {attrId, valueId, label}
 
   const { data: attributes = [], isLoading } = useQuery({
     queryKey: ['attributes'],
@@ -36,73 +60,278 @@ export default function AttributesTab() {
 
   const addAttr = useMutation({
     mutationFn: (name) => attributesApi.create({ name }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['attributes'] }); setNewAttrName(''); setAddError(''); toast('Характеристика добавлена'); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['attributes'] });
+      setNewAttrName('');
+      setAddError('');
+      toast('Характеристика добавлена');
+    },
     onError: () => setAddError('Характеристика с таким названием уже существует'),
   });
 
   const updateAttr = useMutation({
     mutationFn: ({ id, name }) => attributesApi.update(id, { name }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['attributes'] }); setEditingAttr(null); setEditAttrError(''); toast('Переименовано'); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['attributes'] });
+      setEditingAttr(null);
+      setEditAttrError('');
+      toast('Переименовано');
+    },
     onError: () => setEditAttrError('Такое название уже существует'),
   });
 
   const deleteAttr = useMutation({
     mutationFn: (id) => attributesApi.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['attributes'] }); setPendingDeleteAttr(null); toast('Удалено'); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['attributes'] });
+      setPendingDeleteAttr(null);
+      toast('Удалено');
+    },
   });
 
   const reorder = useMutation({
     mutationFn: ({ id, direction }) => attributesApi.reorder(id, direction),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['attributes'] }),
+    onError: () => toast('Ошибка изменения порядка'),
+  });
+
+  const setStrict = useMutation({
+    mutationFn: ({ id, strict_values }) => attributesApi.setStrict(id, strict_values),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['attributes'] }),
+    onError: () => toast('Ошибка'),
   });
 
   const addValue = useMutation({
-    mutationFn: ({ attrId, value }) => attributesApi.addValue(attrId, { value }),
-    onSuccess: (_, vars) => { qc.invalidateQueries({ queryKey: ['attributes'] }); setNewValues((p) => ({ ...p, [vars.attrId]: '' })); toast('Вариант добавлен'); },
+    mutationFn: ({ attrId, value, parent_id }) =>
+      attributesApi.addValue(attrId, { value, parent_id }),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['attributes'] });
+      toast('Добавлено');
+      setAddingFor(null);
+      setAddingText('');
+      if (vars.parent_id != null) {
+        setExpandedValues((p) => ({ ...p, [vars.parent_id]: true }));
+      }
+    },
+    onError: () => toast('Ошибка при добавлении'),
   });
 
   const updateValue = useMutation({
-    mutationFn: ({ attrId, valueId, value }) => attributesApi.updateValue(attrId, valueId, { value }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['attributes'] }); setEditingValue(null); toast('Вариант обновлён'); },
+    mutationFn: ({ attrId, valueId, value }) =>
+      attributesApi.updateValue(attrId, valueId, { value }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['attributes'] });
+      setEditingValue(null);
+      toast('Переименовано');
+    },
+    onError: () => toast('Ошибка при переименовании'),
   });
 
   const deleteValue = useMutation({
     mutationFn: ({ attrId, valueId }) => attributesApi.deleteValue(attrId, valueId),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['attributes'] }); setPendingDeleteValue(null); toast('Вариант удалён'); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['attributes'] });
+      setPendingDeleteValue(null);
+      toast('Удалено');
+    },
+    onError: () => toast('Ошибка при удалении'),
   });
 
   const toggle = (id) => setExpanded((p) => ({ ...p, [id]: !p[id] }));
+  const toggleValue = (id) => setExpandedValues((p) => ({ ...p, [id]: !p[id] }));
 
   const handleAddAttr = () => {
     const name = newAttrName.trim();
     if (!name) return;
     if (attributes.some((a) => a.name.toLowerCase() === name.toLowerCase())) {
-      setAddError('Характеристика с таким названием уже существует'); return;
+      setAddError('Характеристика с таким названием уже существует');
+      return;
     }
-    setAddError(''); addAttr.mutate(name);
+    setAddError('');
+    addAttr.mutate(name);
   };
 
-  const handleAddValue = (attrId) => {
-    const v = (newValues[attrId] || '').trim();
-    if (v) addValue.mutate({ attrId, value: v });
+  const handleAddValue = (attrId, parentId) => {
+    const v = addingText.trim();
+    if (!v) return;
+    addValue.mutate({ attrId, value: v, parent_id: parentId });
   };
 
-  const startEditAttr = (attr) => { setEditingAttr({ id: attr.id, value: attr.name }); setEditAttrError(''); setPendingDeleteAttr(null); };
+  const startAddingFor = (attrId, parentId) => {
+    setAddingFor({ attrId, parentId });
+    setAddingText('');
+    if (parentId != null) setExpandedValues((p) => ({ ...p, [parentId]: true }));
+  };
+
+  const startEditAttr = (attr) => {
+    setEditingAttr({ id: attr.id, value: attr.name });
+    setEditAttrError('');
+    setPendingDeleteAttr(null);
+  };
+
   const saveAttrEdit = () => {
     const name = editingAttr.value.trim();
     if (!name) return;
-    if (attributes.some((a) => a.name.toLowerCase() === name.toLowerCase() && a.id !== editingAttr.id)) {
-      setEditAttrError('Такое название уже существует'); return;
+    if (
+      attributes.some(
+        (a) => a.name.toLowerCase() === name.toLowerCase() && a.id !== editingAttr.id
+      )
+    ) {
+      setEditAttrError('Такое название уже существует');
+      return;
     }
     updateAttr.mutate({ id: editingAttr.id, name });
   };
 
-  const startEditValue = (attrId, v) => { setEditingValue({ attrId, valueId: v.id, value: v.value }); setPendingDeleteValue(null); };
+  const startEditValue = (attrId, node) => {
+    setEditingValue({ attrId, valueId: node.id, value: node.value });
+    setPendingDeleteValue(null);
+  };
+
   const saveValueEdit = () => {
     const value = editingValue.value.trim();
     if (!value) return;
-    updateValue.mutate({ attrId: editingValue.attrId, valueId: editingValue.valueId, value });
+    updateValue.mutate({
+      attrId: editingValue.attrId,
+      valueId: editingValue.valueId,
+      value,
+    });
   };
+
+  // Recursive tree renderer
+  const renderValueTree = (nodes, attrId) =>
+    nodes.map((node) => {
+      const isEditingThis =
+        editingValue?.attrId === attrId && editingValue?.valueId === node.id;
+      const isPendingDel =
+        pendingDeleteValue?.attrId === attrId && pendingDeleteValue?.valueId === node.id;
+      const isExpanded = expandedValues[node.id];
+      const hasChildren = (node.children || []).length > 0;
+      const isAddingChild =
+        addingFor?.attrId === attrId && addingFor?.parentId === node.id;
+
+      return (
+        <div key={node.id}>
+          <div className="attr-value-row">
+            <button
+              type="button"
+              className="value-tree-toggle"
+              onClick={() => toggleValue(node.id)}
+              style={{ visibility: hasChildren ? 'visible' : 'hidden' }}
+              title={isExpanded ? 'Свернуть' : 'Развернуть'}
+            >
+              {isExpanded ? '▾' : '▸'}
+            </button>
+
+            {isEditingThis ? (
+              <>
+                <input
+                  className="form-input attr-val-edit-input"
+                  value={editingValue.value}
+                  autoFocus
+                  onChange={(e) =>
+                    setEditingValue({ ...editingValue, value: e.target.value })
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveValueEdit();
+                    if (e.key === 'Escape') setEditingValue(null);
+                  }}
+                />
+                <button
+                  className="btn btn-ghost btn-icon btn-sm edit-confirm"
+                  onClick={saveValueEdit}
+                  title="Сохранить"
+                >✓</button>
+                <button
+                  className="btn btn-ghost btn-icon btn-sm"
+                  onClick={() => setEditingValue(null)}
+                  title="Отмена"
+                >✗</button>
+              </>
+            ) : isPendingDel ? (
+              <>
+                <span className="attr-value-text del-pending-text">
+                  {hasChildren
+                    ? `Удалить «${node.value}» и вложенные?`
+                    : `Удалить «${node.value}»?`}
+                </span>
+                <div className="attr-value-actions">
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setPendingDeleteValue(null)}
+                  >Нет</button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    disabled={deleteValue.isPending}
+                    onClick={() => deleteValue.mutate({ attrId, valueId: node.id })}
+                  >Да</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="attr-value-text">{node.value}</span>
+                <div className="attr-value-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-icon btn-sm"
+                    onClick={() => startAddingFor(attrId, node.id)}
+                    title="Добавить дочерний узел"
+                  ><PlusChildIcon /></button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-icon btn-sm pencil-btn"
+                    onClick={() => startEditValue(attrId, node)}
+                    title="Переименовать"
+                  ><EditIcon /></button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-icon btn-sm char-del"
+                    onClick={() => {
+                      setPendingDeleteValue({ attrId, valueId: node.id });
+                      setEditingValue(null);
+                    }}
+                    title="Удалить"
+                  >✕</button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Children + inline add-child form */}
+          {(hasChildren || isAddingChild) && (isExpanded || isAddingChild) && (
+            <div className="value-tree-child">
+              {hasChildren && renderValueTree(node.children, attrId)}
+              {isAddingChild && (
+                <div className="attr-add-value">
+                  <input
+                    className="form-input"
+                    placeholder="Название дочернего узла..."
+                    value={addingText}
+                    autoFocus
+                    onChange={(e) => setAddingText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAddValue(attrId, node.id);
+                      if (e.key === 'Escape') setAddingFor(null);
+                    }}
+                  />
+                  <button
+                    className="btn btn-ghost btn-icon check-add-btn"
+                    disabled={!addingText.trim() || addValue.isPending}
+                    onClick={() => handleAddValue(attrId, node.id)}
+                    title="Добавить"
+                  >✓</button>
+                  <button
+                    className="btn btn-ghost btn-icon btn-sm"
+                    onClick={() => setAddingFor(null)}
+                    title="Отмена"
+                  >✗</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    });
 
   const filteredAttrs = search
     ? attributes.filter((a) => a.name.toLowerCase().includes(search.toLowerCase()))
@@ -122,7 +351,11 @@ export default function AttributesTab() {
             onChange={(e) => { setNewAttrName(e.target.value); setAddError(''); }}
             onKeyDown={(e) => e.key === 'Enter' && handleAddAttr()}
           />
-          <button className="btn btn-primary" disabled={!newAttrName.trim() || addAttr.isPending} onClick={handleAddAttr}>
+          <button
+            className="btn btn-primary"
+            disabled={!newAttrName.trim() || addAttr.isPending}
+            onClick={handleAddAttr}
+          >
             + Добавить
           </button>
         </div>
@@ -131,12 +364,20 @@ export default function AttributesTab() {
 
       {attributes.length > 0 && (
         <div className="tab-search-wrap">
-          <input className="form-input tab-search" placeholder="Поиск характеристик..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input
+            className="form-input tab-search"
+            placeholder="Поиск характеристик..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
       )}
 
       {filteredAttrs.length === 0 && attributes.length === 0 ? (
-        <div className="empty-state"><h3>Нет характеристик</h3><p>Добавьте первую характеристику выше</p></div>
+        <div className="empty-state">
+          <h3>Нет характеристик</h3>
+          <p>Добавьте первую характеристику выше</p>
+        </div>
       ) : filteredAttrs.length === 0 ? (
         <div className="empty-state"><p>Ничего не найдено</p></div>
       ) : (
@@ -145,6 +386,7 @@ export default function AttributesTab() {
             const originalIdx = attributes.findIndex((a) => a.id === attr.id);
             const isEditingThisAttr = editingAttr?.id === attr.id;
             const isPendingDelete = pendingDeleteAttr === attr.id;
+            const totalCount = countAll(attr.values);
 
             return (
               <div key={attr.id} className="attr-item">
@@ -157,29 +399,81 @@ export default function AttributesTab() {
                         className="form-input attr-edit-input"
                         value={editingAttr.value}
                         autoFocus
-                        onChange={(e) => { setEditingAttr({ ...editingAttr, value: e.target.value }); setEditAttrError(''); }}
-                        onKeyDown={(e) => { if (e.key === 'Enter') saveAttrEdit(); if (e.key === 'Escape') { setEditingAttr(null); setEditAttrError(''); } }}
+                        onChange={(e) => {
+                          setEditingAttr({ ...editingAttr, value: e.target.value });
+                          setEditAttrError('');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveAttrEdit();
+                          if (e.key === 'Escape') { setEditingAttr(null); setEditAttrError(''); }
+                        }}
                       />
-                      <button className="btn btn-ghost btn-icon btn-sm edit-confirm" onClick={saveAttrEdit} title="Сохранить">✓</button>
-                      <button className="btn btn-ghost btn-icon btn-sm" onClick={() => { setEditingAttr(null); setEditAttrError(''); }} title="Отмена">✗</button>
+                      <button
+                        className="btn btn-ghost btn-icon btn-sm edit-confirm"
+                        onClick={saveAttrEdit}
+                        title="Сохранить"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-icon btn-sm"
+                        onClick={() => { setEditingAttr(null); setEditAttrError(''); }}
+                        title="Отмена"
+                      >
+                        ✗
+                      </button>
                     </>
                   ) : (
                     <>
                       <button type="button" className="attr-name-btn" onClick={() => toggle(attr.id)}>
                         <span className="attr-name-text">{attr.name}</span>
-                        <span className="attr-values-count">{attr.values.length} вар.</span>
+                        <span className="attr-values-count">
+                          {totalCount} {totalCount === 1 ? 'узел' : totalCount < 5 ? 'узла' : 'узлов'}
+                        </span>
                         <span className="attr-chevron">{expanded[attr.id] ? '▲' : '▼'}</span>
                       </button>
-                      <button className="btn btn-ghost btn-icon btn-sm pencil-btn" onClick={() => startEditAttr(attr)} title="Переименовать">
+                      <button
+                        className="btn btn-ghost btn-icon btn-sm pencil-btn"
+                        onClick={() => startEditAttr(attr)}
+                        title="Переименовать"
+                      >
                         <EditIcon />
                       </button>
                     </>
                   )}
 
                   <div className="attr-actions">
-                    <button className="btn btn-ghost btn-icon btn-sm reorder-btn" onClick={() => reorder.mutate({ id: attr.id, direction: 'up' })} disabled={originalIdx === 0 || reorder.isPending} title="Повысить приоритет">↑</button>
-                    <button className="btn btn-ghost btn-icon btn-sm reorder-btn" onClick={() => reorder.mutate({ id: attr.id, direction: 'down' })} disabled={originalIdx === attributes.length - 1 || reorder.isPending} title="Понизить приоритет">↓</button>
-                    <button className="btn btn-ghost btn-icon btn-sm char-del" onClick={() => { setPendingDeleteAttr(attr.id); setEditingAttr(null); }} title="Удалить">✕</button>
+                    <button
+                      className={`btn btn-ghost btn-icon btn-sm ${attr.strict_values ? 'strict-on' : ''}`}
+                      onClick={() => setStrict.mutate({ id: attr.id, strict_values: !attr.strict_values })}
+                      disabled={setStrict.isPending}
+                      title={attr.strict_values ? 'Строгий выбор (только из вариантов) — нажмите чтобы разрешить свободный ввод' : 'Свободный ввод — нажмите чтобы разрешить только выбор из вариантов'}
+                    >
+                      {attr.strict_values ? <LockIcon /> : <UnlockIcon />}
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-icon btn-sm reorder-btn"
+                      onClick={() => reorder.mutate({ id: attr.id, direction: 'up' })}
+                      disabled={originalIdx === 0 || reorder.isPending}
+                      title="Повысить приоритет"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-icon btn-sm reorder-btn"
+                      onClick={() => reorder.mutate({ id: attr.id, direction: 'down' })}
+                      disabled={originalIdx === attributes.length - 1 || reorder.isPending}
+                      title="Понизить приоритет"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-icon btn-sm char-del"
+                      onClick={() => { setPendingDeleteAttr(attr.id); setEditingAttr(null); }}
+                      title="Удалить"
+                    >
+                      ✕
+                    </button>
                   </div>
                 </div>
 
@@ -189,70 +483,68 @@ export default function AttributesTab() {
 
                 {isPendingDelete && (
                   <div className="confirm-bar">
-                    <span>Удалить «{attr.name}» и все её варианты?</span>
-                    <button className="btn btn-secondary btn-sm" onClick={() => setPendingDeleteAttr(null)}>Нет</button>
-                    <button className="btn btn-danger btn-sm" disabled={deleteAttr.isPending} onClick={() => deleteAttr.mutate(attr.id)}>Да, удалить</button>
+                    <span>Удалить «{attr.name}» и все её узлы?</span>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setPendingDeleteAttr(null)}>
+                      Нет
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      disabled={deleteAttr.isPending}
+                      onClick={() => deleteAttr.mutate(attr.id)}
+                    >
+                      Да, удалить
+                    </button>
                   </div>
                 )}
 
                 {expanded[attr.id] && (
                   <div className="attr-values-panel">
-                    {attr.values.length === 0 && <p className="attr-empty-vals">Вариантов пока нет</p>}
+                    {attr.values.length === 0 && !(addingFor?.attrId === attr.id && addingFor?.parentId === null) && (
+                      <p className="attr-empty-vals">Значений пока нет — добавьте первое</p>
+                    )}
 
-                    {attr.values.map((v) => {
-                      const isEditingVal = editingValue?.attrId === attr.id && editingValue?.valueId === v.id;
-                      const isPendingDelVal = pendingDeleteValue?.attrId === attr.id && pendingDeleteValue?.valueId === v.id;
+                    {renderValueTree(attr.values, attr.id)}
 
-                      return (
-                        <div key={v.id} className="attr-value-row">
-                          {isEditingVal ? (
-                            <>
-                              <input
-                                className="form-input attr-val-edit-input"
-                                value={editingValue.value}
-                                autoFocus
-                                onChange={(e) => setEditingValue({ ...editingValue, value: e.target.value })}
-                                onKeyDown={(e) => { if (e.key === 'Enter') saveValueEdit(); if (e.key === 'Escape') setEditingValue(null); }}
-                              />
-                              <button className="btn btn-ghost btn-icon btn-sm edit-confirm" onClick={saveValueEdit} title="Сохранить">✓</button>
-                              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setEditingValue(null)} title="Отмена">✗</button>
-                            </>
-                          ) : isPendingDelVal ? (
-                            <>
-                              <span className="attr-value-text del-pending-text">Удалить «{v.value}»?</span>
-                              <div className="attr-value-actions">
-                                <button className="btn btn-secondary btn-sm" onClick={() => setPendingDeleteValue(null)}>Нет</button>
-                                <button className="btn btn-danger btn-sm" disabled={deleteValue.isPending} onClick={() => deleteValue.mutate({ attrId: attr.id, valueId: v.id })}>Да</button>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <span className="attr-value-text">{v.value}</span>
-                              <div className="attr-value-actions">
-                                <button type="button" className="btn btn-ghost btn-icon btn-sm pencil-btn" onClick={() => startEditValue(attr.id, v)} title="Редактировать"><EditIcon /></button>
-                                <button type="button" className="btn btn-ghost btn-icon btn-sm char-del" onClick={() => { setPendingDeleteValue({ attrId: attr.id, valueId: v.id }); setEditingValue(null); }} title="Удалить">✕</button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    <div className="attr-add-value">
-                      <input
-                        className="form-input"
-                        placeholder="Новый вариант (напр. Круглая)"
-                        value={newValues[attr.id] || ''}
-                        onChange={(e) => setNewValues((p) => ({ ...p, [attr.id]: e.target.value }))}
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddValue(attr.id)}
-                      />
+                    {/* Add root value */}
+                    {addingFor?.attrId === attr.id && addingFor?.parentId === null ? (
+                      <div className="attr-add-value" style={{ marginTop: attr.values.length ? '0.5rem' : 0 }}>
+                        <input
+                          className="form-input"
+                          placeholder="Новое значение..."
+                          value={addingText}
+                          autoFocus
+                          onChange={(e) => setAddingText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleAddValue(attr.id, null);
+                            if (e.key === 'Escape') setAddingFor(null);
+                          }}
+                        />
+                        <button
+                          className="btn btn-ghost btn-icon check-add-btn"
+                          disabled={!addingText.trim() || addValue.isPending}
+                          onClick={() => handleAddValue(attr.id, null)}
+                          title="Добавить"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          className="btn btn-ghost btn-icon btn-sm"
+                          onClick={() => setAddingFor(null)}
+                          title="Отмена"
+                        >
+                          ✗
+                        </button>
+                      </div>
+                    ) : (
                       <button
-                        className="btn btn-ghost btn-icon check-add-btn"
-                        disabled={!(newValues[attr.id] || '').trim() || addValue.isPending}
-                        onClick={() => handleAddValue(attr.id)}
-                        title="Добавить вариант"
-                      >✓</button>
-                    </div>
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        style={{ marginTop: attr.values.length ? '0.35rem' : 0, alignSelf: 'flex-start' }}
+                        onClick={() => startAddingFor(attr.id, null)}
+                      >
+                        + Добавить значение
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
