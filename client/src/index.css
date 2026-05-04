@@ -91,6 +91,8 @@ input[type="number"] { -moz-appearance: textfield; }
 .btn-sm { padding: 0.3rem 0.65rem; font-size: 12px; }
 .btn-icon { padding: 0.35rem; width: 30px; height: 30px; justify-content: center; }
 .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-success { background: transparent; color: var(--success); border-color: rgba(48, 164, 108, 0.4); }
+.btn-success:hover:not(:disabled) { background: rgba(48, 164, 108, 0.1); border-color: var(--success); }
 
 /* ===== CONTROLS ===== */
 .controls { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }

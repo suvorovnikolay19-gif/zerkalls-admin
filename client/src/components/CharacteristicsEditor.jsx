@@ -251,7 +251,7 @@ export default function CharacteristicsEditor({ value, onChange, attributes = []
             return (
               <div key={i} className={`char-row${isCont ? ' char-row-cont' : ''}`}>
                 {isCont ? (
-                  <div className="char-row-attr char-row-attr-cont">—</div>
+                  <div className="char-row-attr char-row-attr-cont" />
                 ) : (
                   <select
                     className="form-input form-select char-row-attr"
@@ -301,8 +301,8 @@ export default function CharacteristicsEditor({ value, onChange, attributes = []
           })}
         </div>
       )}
-      <button type="button" className="btn btn-secondary btn-sm" onClick={add}>
-        + Добавить характеристику
+      <button type="button" className="btn btn-success btn-sm" onClick={add}>
+        Добавить
       </button>
     </div>
   );
