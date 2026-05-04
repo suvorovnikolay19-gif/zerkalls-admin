@@ -273,7 +273,7 @@ export default function AttributesTab() {
                 <div className="attr-value-actions">
                   <button
                     type="button"
-                    className="btn btn-ghost btn-icon btn-sm"
+                    className="btn btn-ghost btn-icon btn-sm btn-add-child"
                     onClick={() => startAddingFor(attrId, node.id)}
                     title="Добавить дочерний узел"
                   ><PlusChildIcon /></button>
@@ -538,7 +538,7 @@ export default function AttributesTab() {
                     ) : (
                       <button
                         type="button"
-                        className="btn btn-ghost btn-sm"
+                        className="btn btn-ghost btn-sm btn-add-root-val"
                         style={{ marginTop: attr.values.length ? '0.35rem' : 0, alignSelf: 'flex-start' }}
                         onClick={() => startAddingFor(attr.id, null)}
                       >

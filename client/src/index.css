@@ -351,6 +351,17 @@ input[type="number"] { -moz-appearance: textfield; }
 .val-item-text { flex: 1; }
 .val-item-arrow { color: var(--fg3); font-size: 13px; flex-shrink: 0; }
 .val-dropdown-empty { padding: 8px 12px; font-size: 12px; color: var(--fg3); }
+.val-dropdown-item.used { color: var(--fg3); cursor: default; }
+.val-dropdown-item.used:hover { background: none; }
+.val-item-used { font-size: 11px; color: var(--fg3); flex-shrink: 0; margin-left: 4px; }
+
+/* Add-child (PlusChildIcon) button — green */
+.btn-add-child { color: var(--success) !important; }
+.btn-add-child:hover:not(:disabled) { background: rgba(48, 164, 108, 0.1) !important; color: var(--success) !important; }
+
+/* Add root value button — accent blue */
+.btn-add-root-val { color: var(--accent) !important; }
+.btn-add-root-val:hover:not(:disabled) { background: var(--accent-light) !important; color: var(--accent) !important; }
 
 /* Strict lock toggle in attr header */
 .strict-on { color: var(--accent) !important; }
