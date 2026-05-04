@@ -301,8 +301,8 @@ export default function CharacteristicsEditor({ value, onChange, attributes = []
           })}
         </div>
       )}
-      <button type="button" className="btn btn-success btn-sm" onClick={add}>
-        Добавить
+      <button type="button" className="btn btn-secondary btn-sm" onClick={add}>
+        + Добавить характеристику
       </button>
     </div>
   );

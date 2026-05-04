@@ -352,11 +352,11 @@ export default function AttributesTab() {
             onKeyDown={(e) => e.key === 'Enter' && handleAddAttr()}
           />
           <button
-            className="btn btn-primary"
+            className="btn btn-success"
             disabled={!newAttrName.trim() || addAttr.isPending}
             onClick={handleAddAttr}
           >
-            + Добавить
+            Добавить
           </button>
         </div>
       </div>
