@@ -269,7 +269,11 @@ export default function AttributesTab() {
               </>
             ) : (
               <>
-                <span className="attr-value-text">{node.value}</span>
+                <span
+                  className="attr-value-text"
+                  onClick={hasChildren ? () => toggleValue(node.id) : undefined}
+                  style={hasChildren ? { cursor: 'pointer' } : undefined}
+                >{node.value}</span>
                 <div className="attr-value-actions">
                   <button
                     type="button"
