@@ -423,6 +423,11 @@ input[type="number"] { -moz-appearance: textfield; }
 .attr-item {
   background: var(--card-bg); border: 1px solid var(--border);
   border-radius: var(--radius-card); overflow: hidden;
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.attr-item-strict {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
 }
 .attr-header {
   display: flex; align-items: center; gap: 0.5rem;

@@ -131,13 +131,16 @@ function ValueFlyoutPicker({ values, selectedId, selectedText, onSelectId, onSel
         className="form-input val-picker-input"
         placeholder="Значение..."
         value={open ? query : displayLabel}
+        readOnly={isStrict}
+        style={isStrict ? { cursor: 'pointer' } : undefined}
         onFocus={openDrop}
         onClick={openDrop}
         onChange={(e) => {
+          if (isStrict) return;
           const t = e.target.value;
           setQuery(t);
           setOpen(true);
-          if (!isStrict) onSelectText(t);
+          onSelectText(t);
         }}
         onKeyDown={(e) => {
           if (e.key === 'Escape') { setOpen(false); setQuery(''); }

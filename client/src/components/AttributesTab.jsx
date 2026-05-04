@@ -389,7 +389,7 @@ export default function AttributesTab() {
             const totalCount = countAll(attr.values);
 
             return (
-              <div key={attr.id} className="attr-item">
+              <div key={attr.id} className={`attr-item${attr.strict_values ? ' attr-item-strict' : ''}`}>
                 <div className="attr-header">
                   <div className="attr-priority">{originalIdx + 1}</div>
 
