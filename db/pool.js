@@ -5,9 +5,11 @@ const path = require('path');
 const isProduction = process.env.NODE_ENV === 'production' ||
   (process.env.DATABASE_URL || '').includes('railway');
 
+const needsSsl = isProduction || (process.env.DATABASE_URL || '').includes('neon.tech');
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
+  ssl: needsSsl ? { rejectUnauthorized: false } : false,
 });
 
 async function initDb() {
