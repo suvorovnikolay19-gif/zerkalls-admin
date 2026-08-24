@@ -7,6 +7,7 @@ const productsRouter = require('./routes/products');
 const uploadRouter = require('./routes/upload');
 const attributesRouter = require('./routes/attributes');
 const mirrorClassesRouter = require('./routes/mirror-classes');
+const paymentRouter = require('./routes/payment');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -19,6 +20,7 @@ app.use('/api/products', productsRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/attributes', attributesRouter);
 app.use('/api/mirror-classes', mirrorClassesRouter);
+app.use('/api/payment', paymentRouter);
 
 if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, 'client', 'dist');

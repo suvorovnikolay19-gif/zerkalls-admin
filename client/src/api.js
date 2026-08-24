@@ -38,5 +38,9 @@ export const mirrorClassesApi = {
   delete: (id) => api.delete(`/mirror-classes/${id}`),
 };
 
+export const paymentApi = {
+  create: (data) => api.post('/payment/create', data),
+};
+
 // Cloudinary returns full https:// URLs stored directly in DB
 export const getImageUrl = (url) => url;

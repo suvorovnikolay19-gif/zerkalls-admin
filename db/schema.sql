@@ -68,6 +68,31 @@ CREATE INDEX IF NOT EXISTS idx_mirror_class_attrs_class_id ON mirror_class_attri
 ALTER TABLE attribute_values ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES attribute_values(id) ON DELETE CASCADE;
 ALTER TABLE attributes ADD COLUMN IF NOT EXISTS strict_values BOOLEAN DEFAULT false;
 
+-- ===== ORDERS =====
+CREATE TABLE IF NOT EXISTS orders (
+  id SERIAL PRIMARY KEY,
+  customer_name VARCHAR(255),
+  customer_phone VARCHAR(50),
+  customer_email VARCHAR(255),
+  total DECIMAL(10, 2) NOT NULL,
+  status VARCHAR(50) DEFAULT 'pending',
+  payment_id VARCHAR(255),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id SERIAL PRIMARY KEY,
+  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+  product_name VARCHAR(255) NOT NULL,
+  price DECIMAL(10, 2) NOT NULL,
+  quantity INTEGER DEFAULT 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_orders_payment_id ON orders(payment_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -79,4 +104,9 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS products_updated_at ON products;
 CREATE TRIGGER products_updated_at
   BEFORE UPDATE ON products
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+DROP TRIGGER IF EXISTS orders_updated_at ON orders;
+CREATE TRIGGER orders_updated_at
+  BEFORE UPDATE ON orders
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
